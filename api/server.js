@@ -4,6 +4,7 @@ const knex = require("knex");
 const knexConfig = require("../knexfile");
 const bcrypt = require("bcryptjs");
 const session = require("express-session");
+const KnexSessionStore = require("connect-session-knex")(session); // order matters because we need to pass in session
 
 const server = express();
 
@@ -18,7 +19,16 @@ const sessionConfig = {
   },
   httpOnly: true, // js can't touch this cookie
   resave: false, // read about this
-  saveUninitialized: false // read about this
+  saveUninitialized: false, // read about this
+  store: new KnexSessionStore({
+    // used to save session if server restarts
+    // this configuration will be different depending on the library used
+    tablename: "sessions",
+    sidfieldname: "sid",
+    knex: db,
+    createtable: true,
+    clearInterval: 1000 * 60 * 60
+  })
 };
 
 server.use(helmet());
@@ -62,7 +72,6 @@ server.post("/login", (req, res) => {
 function protected(req, res, next) {
   // if the user us logged in, we call next()
   if (req.session && req.session.user) {
-    console.log(req.session);
     next();
   } else {
     res.status(401).json({ message: "You shall not pass, not authenticated." });
